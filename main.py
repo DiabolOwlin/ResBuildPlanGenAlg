@@ -2,8 +2,6 @@ import copy
 import random
 import requests
 from PIL import Image as img
-import notion_database
-
 
 
 # Vitalik
@@ -44,11 +42,8 @@ class FlatDNA:
         return str(self.DNA)
 
 
-
-
 def define_params(apart_type):
-
-    PARAMS = {
+    params = {
         "filter": {
             "property": "Type",
             "multi_select": {
@@ -56,25 +51,22 @@ def define_params(apart_type):
             }
         }
     }
-    return PARAMS
+    return params
 
-def query_database(databaseId, headers, apart_type):
-    PARAMS = define_params(apart_type)
-    readUrl = f"https://api.notion.com/v1/databases/{databaseId}/query"
-    res = requests.request("POST", readUrl, json=PARAMS, headers=headers)
+
+def query_database(databaseId, header, apart_type):
+    params = define_params(apart_type)
+    read_url = f"https://api.notion.com/v1/databases/{databaseId}/query"
+    res = requests.request("POST", read_url, json=params, headers=header)
     data = res.json()
     return data
 
 
-
-def retrieve_database(databaseId, headers):
-    readUrl = f"https://api.notion.com/v1/databases/{databaseId}"
-    res = requests.request("GET", readUrl, headers=headers)
+def retrieve_database(databaseId, header):
+    read_url = f"https://api.notion.com/v1/databases/{databaseId}"
+    res = requests.request("GET", read_url, headers=header)
     data = res.json()
     return data
-
-
-
 
 
 class Floor:
@@ -237,6 +229,4 @@ class GeneticFloor:
             delta += abs(d1[i] - d2[i])
         return delta
 
-
 # if __name__ == "__main__":
-
