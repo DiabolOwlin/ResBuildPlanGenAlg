@@ -127,15 +127,11 @@ class Floor:
     def fill_floor(self):
 
         for i in range(len(self.Plan)):
-            # print(i)
             if self.Plan[i][0].DNA['Type'] == 'E':
                 label = self.Plan[i][0].DNA['Rooms']
-                # print("E")
                 while True:
                     flat = random.choice(end_apartments)
                     lab = flat[0]['Rooms']
-                    # print(f'flat: {flat[1][0]}')
-                    # print(f'label in DNA: {label} / label in flat from db: {lab}')
                     if lab == label:
                         self.Plan[i][1].append(flat[1][0])
                         self.Plan[i].append(flat[2])
@@ -144,7 +140,6 @@ class Floor:
             else:
             # if self.Plan[i][0].DNA['Type'] == 'R':
                 label = self.Plan[i][0].DNA['Rooms']
-                # print('S')
                 while True:
                     flat = random.choice(row_apartments)
                     lab = flat[0]['Rooms']
@@ -154,16 +149,11 @@ class Floor:
                         self.Plan[i].append(flat[2])
                         break
 
-            # print(f'i = {i}, len_plan = {len(self.Plan)}, len_end_apart = {len(end_apartments)}, len_row_apart = {len(row_apartments)}')
-            # print(self.Plan)
-            # print(f'////////////////////// {end_apartments[i][2]}')
     # Determining the actual floor geometry and area
     def floor_square(self):
         self.Width = 0
         self.Depth = 0
         for i in range(len(self.Plan)):
-            # self.Width += self.Plan[i][1][0]['properties']['Width']['number']
-            # self.Depth += self.Plan[i][1][0]['properties']['Depth']['number']
             self.Width += self.Plan[i][2]['Width']
             self.Depth += self.Plan[i][2]['Depth']
 
@@ -186,11 +176,12 @@ class Floor:
         w = 0
         for i in range(len(self.Plan)):
             print(i)
-            url = self.Plan[i][1][0]['properties']['Layout']['files'][0]['file']['url']
+            url = self.Plan[i][1][0]
             print(url)
             im = img.open(requests.get(url, stream=True).raw)
             floor_img.paste(im, (int(w / 10), 0))
-            w += self.Plan[i][1][0]['properties']['Width']['number']
+            w += self.Plan[i][2]['Width']
+        print(f"Width from get_png: {w}")
         floor_img.save(f'./floor_img.png')
 
 
@@ -223,6 +214,11 @@ class GeneticFloor:
             f'Final distribution of apartments: {self.BestFloor[0].FloorPercent_Dict}, '
             f'deviations: {self.BestDeltaP}/{self.BestDeltaS}/{self.BestDelta}, width: {self.BestFloor[0].Width}')
         print(f'Apartment quantity : {self.BestFloor[0].N}')
+        print('###########################################\nBest floor:')
+        return self.BestFloor[0]
+
+
+
 
 
 
@@ -238,14 +234,11 @@ class GeneticFloor:
         for i in survivors_array:
             new_generation[index] = copy.deepcopy(i)
             index += 1
-        # print(0)
+
         # Changing the layout in the best options from the previous generation
         for i in survivors_array:
-            # print(1)
             for k in range(GeneticFloor.MUTATED):
-                # print(2)
                 for p in range(len(i.Plan)):
-                    print(f'i.Plan[p]: {i.Plan[p]}')
                     if i.Plan[p][0].DNA['Type'] == 'E':
 
                         while True:
@@ -257,8 +250,7 @@ class GeneticFloor:
                                 if lab == label:
                                     i.Plan[p][1][0] = flat
                                     break
-                        print(f'i.Plan[p]: {i.Plan[p]}')
-                        # i.Plan[p].append(end_apartments[p][2])
+                        i.Plan[p].append(flat[2])
                         print(f'Mutation of the corner apartment')
 
                     if i.Plan[p][0].DNA['Type'] == 'R':
@@ -272,17 +264,16 @@ class GeneticFloor:
                                 if lab == label:
                                     i.Plan[p][1][0] = flat
                                     break
-                        # i.Plan[p].append(row_apartments[p][2])
+                        i.Plan[p].append(flat[2])
                         print(f'Mutation of the row apartment')
 
                 new_generation[index] = i
                 index += 1
-        # print(3)
+
         # Adding new options to the new generation
         for i in range(GeneticFloor.NEWBORN):
-            # print(f'gF_n: {GeneticFloor.NEWBORN}')
             n_new = GeneticFloor.FLOOR_SIZE + random.randint(-3, 4)
-            # print(f'n_new: {n_new}')
+
             if n_new <= 0:
                 n_new = 1
             floor1 = Floor(n_new)
@@ -336,38 +327,13 @@ class GeneticFloor:
 
 
 if __name__ == "__main__":
-    # text = query_database(databaseID, headers, 'Row')
-    #
-    # text = text.get('results')
-    # print(text)
-    # urlArray = []
-    # for _ in range(len(text)):
-    #     urlArray.append(text[_].get('properties').get('Layout').get('files')[0].get('file').get('url'))
-    #
-    #
-    # print(urlArray)
-    # print(text.keys())
-
-    # flatDNA = FlatDNA()
-
-    # floor = Floor(3)
-    # print(floor.Plan)
-
-    # floor.fill_floor()
-    # print(floor.Plan)
-
-    # floor.floor_square()
-    # floor.floor_percent()
-    # print(end_apartments)
-    # print('############################')
-    # print(row_apartments)
-
-    # floor.get_png()
 
     gen_floor = GeneticFloor([1, 0, 60000, 10000, 50, 30, 10, 10])
-    # gen_floor.build_new_generation()
-    gen_floor.run_generations(50)
-    print
-    gen_floor.find_best_floor()
-    # gen_floor.compare_floor_percentage()
+
+    best_floor = gen_floor.run_generations(20)
+    best_floor.get_png()
+
+    # for i in range(len(best_floor)):
+    #     print(best_floor[i][1])
+
 
