@@ -172,16 +172,33 @@ class Floor:
             self.FloorPercent_Dict[i] = self.FloorPercent_Dict[i] * 100 / self.N
 
     def get_png(self):
-        floor_img = img.new('RGB', (6000, 3000), color='white')
-        w = 0
+        # floor_img = img.new('RGB', (6000, 3000), color='white')
+        # w = 0
+        # for i in range(len(self.Plan)):
+        #     print(i)
+        #     url = self.Plan[i][1][0]
+        #     print(url)
+        #     im = img.open(requests.get(url, stream=True).raw)
+        #     floor_img.paste(im, (int(w / 10), 0))
+        #     w += self.Plan[i][2]['Width']
+        # print(f"Width from get_png: {w}")
+        # floor_img.save(f'./floor_img.png')
+        urls = []
         for i in range(len(self.Plan)):
-            print(i)
-            url = self.Plan[i][1][0]
-            print(url)
-            im = img.open(requests.get(url, stream=True).raw)
-            floor_img.paste(im, (int(w / 10), 0))
-            w += self.Plan[i][2]['Width']
-        print(f"Width from get_png: {w}")
+            urls.append(self.Plan[i][1][0])
+
+        images = [img.open(requests.get(x, stream=True).raw) for x in urls]
+        widths, depths = zip(*(i.size for i in images))
+        total_width = sum(widths)
+        print(f'total_width: {total_width}')
+        max_height = max(depths)
+        print(f'max_height: {max_height}')
+
+        floor_img = img.new('RGB', (total_width, max_height), color='white')
+        x_offset = 0
+        for im in images:
+            floor_img.paste(im, (x_offset, 0))
+            x_offset += im.size[0]
         floor_img.save(f'./floor_img.png')
 
 
