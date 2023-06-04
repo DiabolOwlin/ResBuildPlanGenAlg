@@ -6,9 +6,6 @@ from PIL import Image as Img
 
 class FlatDNA:
     Gens = {
-        # '''Apartment type: E - End apartment, S - standard apartment '''
-        # '''Layout: S - studio apartment, 1k - 1 room, 2k - 2 rooms, 3k - 3 rooms'''
-
         'Type': [['E', 'R'], 0.5],
         'Rooms': [['1room', '2rooms'], 0.5],
     }
@@ -19,16 +16,6 @@ class FlatDNA:
             'Type': random.choice(FlatDNA.Gens['Type'][0]),
             'Rooms': random.choice(FlatDNA.Gens['Rooms'][0])
         }
-
-        # self.DNA = {
-        #     'Type': random.choice(FlatDNA.Gens['Type'][0])}
-        # if self.DNA['Type'] == 'E':
-        #     choice_list = ['1room', '2rooms']
-        #     self.DNA['Rooms'] = random.choice(choice_list)
-        #
-        # else:
-        #     self.DNA['Rooms'] = random.choice(FlatDNA.Gens['Rooms'][0])
-        # print(f' current DNA: {self.DNA}')
 
         if DNA is not None:
             for i in DNA.keys():
@@ -43,17 +30,19 @@ class Floor:
     def __init__(self, N):
         self.Depth = None
         self.Width = None
-        self.Square = None
-        self.FloorPercent_Dict = None
+        self.Area = None
+
+        self.Floor_Percentage_Dict = None
 
         self.N = N
         self.Plan = []
+
         for i in range(N):
             self.Plan.append([FlatDNA({'Type': 'R'}), []])
         self.Plan[0][0].DNA['Type'] = 'E'
         self.Plan[-1][0].DNA['Type'] = 'E'
 
-    def fill(self, i, label, array):
+    def fill_floor(self, i, label, array):
         while True:
             flat = random.choice(array)
             lab = flat[0]['Rooms']
@@ -63,42 +52,39 @@ class Floor:
                 self.Plan[i].append(flat[2])
                 break
 
-    # Filling the DNA of the floor with specific variants of apartments from the database (random enumeration)
-    def fill_floor(self, end_apartments, row_apartments):
+    def add_data(self, end_apartments, row_apartments):
 
         for i in range(len(self.Plan)):
             if self.Plan[i][0].DNA['Type'] == 'E':
                 label = self.Plan[i][0].DNA['Rooms']
-                self.fill(i, label, end_apartments)
+                self.fill_floor(i, label, end_apartments)
 
             else:
                 label = self.Plan[i][0].DNA['Rooms']
-                self.fill(i, label, row_apartments)
+                self.fill_floor(i, label, row_apartments)
 
-    # Determining the actual floor geometry and area
-    def floor_square(self):
+    def calculate_floor_area(self):
         self.Width = 0
-        self.Depth = 0
+        self.Length = 0
         for i in range(len(self.Plan)):
             self.Width += self.Plan[i][2]['Width']
-            self.Depth += self.Plan[i][2]['Depth']
+            self.Length += self.Plan[i][2]['Depth']
 
-        self.Square = self.Width * self.Depth
+        self.Area = self.Width * self.Length
 
-    # Dictionary generation function with the percentage of apartments on the floor
-    def floor_percent(self):
-        self.FloorPercent_Dict = {}
+    def calculate_floor_percentage(self):
+        self.Floor_Percentage_Dict = {}
         for g in FlatDNA.Gens['Rooms'][0]:
 
-            if g not in self.FloorPercent_Dict.keys():
-                self.FloorPercent_Dict[g] = 0
+            if g not in self.Floor_Percentage_Dict.keys():
+                self.Floor_Percentage_Dict[g] = 0
             for i in range(len(self.Plan)):
 
                 if self.Plan[i][0].DNA['Rooms'] == g:
-                    self.FloorPercent_Dict[g] += 1
+                    self.Floor_Percentage_Dict[g] += 1
 
-        for i in self.FloorPercent_Dict.keys():
-            self.FloorPercent_Dict[i] = self.FloorPercent_Dict[i] * 100 / self.N
+        for i in self.Floor_Percentage_Dict.keys():
+            self.Floor_Percentage_Dict[i] = self.Floor_Percentage_Dict[i] * 100 / self.N
 
     def get_png(self):
         urls = []
@@ -108,11 +94,11 @@ class Floor:
 
         images = [Img.open(requests.get(x, stream=True).raw) for x in urls]
 
-        widths, depths = zip(*(i.size for i in images))
+        widths, lengths = zip(*(i.size for i in images))
         total_width = sum(widths)
-        max_height = max(depths)
+        max_length = max(lengths)
 
-        floor_img = Img.new('RGB', (total_width, max_height), color='white')
+        floor_img = Img.new('RGB', (total_width, max_length), color='white')
         x_offset = 0
         for im in images:
             floor_img.paste(im, (x_offset, 0))
@@ -120,40 +106,76 @@ class Floor:
         floor_img.save(f'./floor_img.png')
 
 
-class GeneticFloor:
-    FLOOR_SIZE = 10
-    NEWBORN = 20
-    MUTATED = 100
-    SURVIVORS = 1
+class GenerationFloor:
+    Floor_Size = 10
+    Survivors = 1
+    Chances = 20
+    Were_Mutated = 100
 
-    # [Floors, Angle, Floor_width, Floor_depth, Room_S, Room_1k, Room_2k, Room_3k]
     def __init__(self, data):
         self.data = data
         self.Generation = {}
 
-    def run_generations(self, N, end_apartments, row_apartments):
+        self.Best_Floor = None
+        self.Best_Delta = None
+        self.Best_Delta_P = None
+        self.Best_Delta_A = None
+
+    def build_new_generation(self, end_apartments, row_apartments, survivors_array=None):
+
+        if survivors_array is None:
+            survivors_array = []
+        generation_new = {}
+        self.Generation = {}
+        index = 0
+
+        for i in survivors_array:
+            generation_new[index] = copy.deepcopy(i)
+            index += 1
+
+        for i in survivors_array:
+            for k in range(GenerationFloor.Were_Mutated):
+                for p in range(len(i.Plan)):
+                    if i.Plan[p][0].DNA['Type'] == 'E':
+                        self.mutation(i, p, end_apartments)
+
+                    else:
+                        self.mutation(i, p, row_apartments)
+
+                generation_new[index] = i
+                index += 1
+
+        for i in range(GenerationFloor.Chances):
+            new_floor_prototype = GenerationFloor.Floor_Size + random.randint(-3, 4)
+
+            if new_floor_prototype <= 0:
+                new_floor_prototype = 1
+
+            new_floor = Floor(new_floor_prototype)
+            new_floor.add_data(end_apartments, row_apartments)
+            generation_new[index] = new_floor
+            index += 1
+
+        self.Generation = copy.deepcopy(generation_new)
+
+    def run_alg(self, N, end_apartments, row_apartments):
         for i in range(N):
             print(f'--- Generation №{(i + 1)} ---')
-            print('===========================================')
+            print('==============================================')
             if hasattr(self, 'BestFloor'):
-
-                # Creating a generation and pass on the best version of the previous generation
-                self.build_new_generation(end_apartments, row_apartments, [self.BestFloor[0]])
+                self.build_new_generation(end_apartments, row_apartments, [self.Best_Floor[0]])
             else:
-
-                # Creating first generation
                 self.build_new_generation(end_apartments, row_apartments)
 
-            # Determining the best option in the current generation
-            self.find_best_floor(GeneticFloor.SURVIVORS)
-            print(f'First generation option: {self.Generation[0].Width}')
-            print(f'Generation`s options quantity: {len(self.Generation)}')
+            self.best_floor(GenerationFloor.Survivors)
+            print(f'First generation width: {self.Generation[0].Width}')
+            print(f'Generation`s quantity: {len(self.Generation)}')
 
         print(
-            f'Final distribution of apartments: {self.BestFloor[0].FloorPercent_Dict}, '
-            f'deviations: {self.BestDeltaP}/{self.BestDeltaS}/{self.BestDelta}, width: {self.BestFloor[0].Width}')
-        print(f'Apartment quantity : {self.BestFloor[0].N}')
-        return self.BestFloor[0]
+            f'Final percentage of apartments: {self.Best_Floor[0].Floor_Percentage_Dict}, '
+            f'deviations: {self.Best_Delta_P}/{self.Best_Delta_A}/{self.Best_Delta}, width: {self.Best_Floor[0].Width}')
+        print(f'Apartment quantity : {self.Best_Floor[0].N}')
+        return self.Best_Floor[0]
 
     def mutation(self, i, p, array):
         while True:
@@ -167,85 +189,39 @@ class GeneticFloor:
                     i.Plan[p].append(flat[2])
                     break
 
-    def build_new_generation(self, end_apartments, row_apartments, survivors_array=None):
-        if survivors_array is None:
-            survivors_array = []
-        new_generation = {}
-        self.Generation = {}
-        index = 0
-
-        # Adding the best floors from the previous generation to the new generation
-        for i in survivors_array:
-            new_generation[index] = copy.deepcopy(i)
-            index += 1
-
-        # Changing the layout in the best options from the previous generation
-        for i in survivors_array:
-            for k in range(GeneticFloor.MUTATED):
-                for p in range(len(i.Plan)):
-                    if i.Plan[p][0].DNA['Type'] == 'E':
-                        self.mutation(i, p, end_apartments)
-
-                    else:
-                        self.mutation(i, p, row_apartments)
-
-                new_generation[index] = i
-                index += 1
-
-        # Adding new options to the new generation
-        for i in range(GeneticFloor.NEWBORN):
-            n_new = GeneticFloor.FLOOR_SIZE + random.randint(-3, 4)
-
-            if n_new <= 0:
-                n_new = 1
-
-            floor1 = Floor(n_new)
-            floor1.fill_floor(end_apartments, row_apartments)
-            new_generation[index] = floor1
-            index += 1
-
-        self.Generation = copy.deepcopy(new_generation)
-
-    def find_best_floor(self, N=1):
-        delta_p = 1000000  # Percentage deviation
-        delta_s = 1000000  # Area deviation
-        delta = 1000000  # Deviation summary
+    def best_floor(self, N=1):
+        delta_p = 1000000
+        delta_a = 1000000
+        delta = 1000000
 
         best_floor = []
         for i in self.Generation.keys():
             g = self.Generation[i]
+            g.calculate_floor_percentage()
+            g.calculate_floor_area()
 
-            # Determined percentages
-            g.floor_percent()
-
-            # Defined geometry
-            g.floor_square()
-
-            # Calculate the deviations from the specified percentage
             delta_p_tmp = self.compare_floor_percentage(
-                {  # 'S': self.data[4],
+                {
                     '1room': self.data[5],
                     '2rooms': self.data[6],
-                    # '3k': self.data[7]
                 },
-                g.FloorPercent_Dict)
+                g.Floor_Percentage_Dict)
 
-            # Calculate the deviation from the width of the floor
             delta_s_tmp = abs(g.Width - self.data[2])
-
-            # Output the combined deviation
             delta_tmp = delta_p_tmp + delta_s_tmp / 1500
             if delta_tmp < delta:
+
                 best_floor.insert(0, g)
                 delta_p = delta_p_tmp
-                delta_s = delta_s_tmp
+                delta_a = delta_s_tmp
                 delta = delta_tmp
 
-        self.BestFloor = best_floor
-        self.BestDelta = delta
-        self.BestDeltaP = delta_p
-        self.BestDeltaS = delta_s
-        GeneticFloor.FLOOR_SIZE = self.BestFloor[0].N
+        self.Best_Floor = best_floor
+        self.Best_Delta = delta
+        self.Best_Delta_P = delta_p
+        self.Best_Delta_A = delta_a
+
+        GenerationFloor.Floor_Size = self.Best_Floor[0].N
 
     def compare_floor_percentage(self, d1, d2):
         delta = 0
